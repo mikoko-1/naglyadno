@@ -34,7 +34,6 @@ export function OnboardingFlow({ account, skills, dark, onDone }: OnboardingFlow
   const [step, setStep] = useState<'hello' | 'diag' | 'done'>('hello');
   const [grade, setGrade] = useState<GradeId>(account.grade || 6);
   const [name, setName] = useState(account.displayName);
-  const [role, setRole] = useState(account.role);
   const [email, setEmail] = useState(account.email);
   const [questions, setQuestions] = useState<GeneratedQuestion[]>([]);
   const [index, setIndex] = useState(0);
@@ -90,7 +89,7 @@ export function OnboardingFlow({ account, skills, dark, onDone }: OnboardingFlow
       grade,
       displayName: name.trim() || 'Ученик',
       email: email.trim(),
-      role,
+      role: 'student',
       baseline,
     });
     nextAccount = logActivity(nextAccount, {
@@ -155,12 +154,13 @@ export function OnboardingFlow({ account, skills, dark, onDone }: OnboardingFlow
         <p className="text-xs font-semibold tracking-wide text-indigo-500 uppercase">60 секунд · старт</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">Сначала поймём, где пробелы</h1>
         <p className={`mt-2 text-sm ${dark ? 'text-slate-400' : 'text-slate-600'}`}>
-          5 коротких задач → персональный план. Без регистрации на сервере: аккаунт хранится на этом устройстве (облако — в Плюс).
+          5 коротких задач → персональный план. Прогресс сохранится на этом устройстве; один раз
+          войди в аккаунт — повторно каждый день вводить пароль не нужно.
         </p>
       </div>
 
       <label className="block space-y-1.5">
-        <span className="text-xs font-semibold">Имя ученика</span>
+        <span className="text-xs font-semibold">Имя</span>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -172,7 +172,7 @@ export function OnboardingFlow({ account, skills, dark, onDone }: OnboardingFlow
       </label>
 
       <label className="block space-y-1.5">
-        <span className="text-xs font-semibold">Email (для входа на устройстве)</span>
+        <span className="text-xs font-semibold">Email (необязательно сейчас)</span>
         <input
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -180,36 +180,9 @@ export function OnboardingFlow({ account, skills, dark, onDone }: OnboardingFlow
           className={`h-11 w-full rounded-xl px-3 text-sm outline-none ring-1 ${
             dark ? 'bg-white/5 ring-white/10' : 'bg-slate-50 ring-slate-200'
           }`}
-          placeholder="parent@mail.ru"
+          placeholder="you@mail.ru"
         />
       </label>
-
-      <div>
-        <p className="text-xs font-semibold">Кто пользуется</p>
-        <div className="mt-2 flex gap-2">
-          {(
-            [
-              ['student', 'Ученик'],
-              ['parent', 'Родитель'],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setRole(id)}
-              className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
-                role === id
-                  ? 'bg-indigo-600 text-white'
-                  : dark
-                    ? 'bg-white/5 text-slate-300'
-                    : 'bg-slate-100 text-slate-600'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
 
       <div>
         <p className="text-xs font-semibold">Класс</p>

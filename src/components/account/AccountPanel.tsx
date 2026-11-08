@@ -169,7 +169,7 @@ export function AccountPanel({
       <section className={`rounded-3xl border p-5 ${card}`}>
         <p className="text-sm font-semibold">{account.displayName || 'Без имени'}</p>
         <p className={`mt-1 text-sm ${muted}`}>
-          {account.email || 'email не указан'} · {account.role === 'parent' ? 'родитель' : 'ученик'} ·{' '}
+          {account.email || 'email не указан'} ·{' '}
           {account.grade} класс
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-2">
