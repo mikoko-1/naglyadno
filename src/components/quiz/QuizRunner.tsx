@@ -18,10 +18,12 @@ import { PASS_THRESHOLD } from '../../lib/progress/storage.ts';
 export type QuizMode = 'practice' | 'test' | 'control';
 
 type QuizRunnerProps = {
-  grade: GradeId;
+  grade?: GradeId;
   mode: QuizMode;
   topicId?: string;
   sectionId?: string;
+  questionsOverride?: Question[];
+  titleOverride?: string;
   onFinished: (score: number, total: number) => void;
   onExit: () => void;
 };
@@ -38,30 +40,37 @@ export function QuizRunner({
   mode,
   topicId,
   sectionId,
+  questionsOverride,
+  titleOverride,
   onFinished,
   onExit,
 }: QuizRunnerProps) {
   const questions = useMemo(() => {
-    if (mode === 'control' && sectionId) return getControlQuestions(grade, sectionId);
+    if (questionsOverride) return questionsOverride;
+    if (mode === 'control' && sectionId && grade) return getControlQuestions(grade, sectionId);
     if (topicId) return getTopicQuestions(topicId, mode === 'practice' ? 'practice' : 'test');
     return [];
-  }, [grade, mode, sectionId, topicId]);
+  }, [grade, mode, sectionId, topicId, questionsOverride]);
 
   const title = useMemo(() => {
-    if (mode === 'control' && sectionId) {
+    if (titleOverride) return titleOverride;
+    if (mode === 'control' && sectionId && grade) {
       const section = getSection(grade, sectionId);
       return section ? `Контрольная: ${section.title}` : 'Контрольная';
     }
-    if (topicId) {
+    if (topicId && grade) {
       const found = getTopic(grade, topicId);
       const label = mode === 'practice' ? 'Практика' : 'Тест';
       return found ? `${label}: ${found.topic.title}` : label;
     }
+    if (topicId) return mode === 'practice' ? 'Практика' : 'Тест';
     return 'Задание';
-  }, [grade, mode, sectionId, topicId]);
+  }, [grade, mode, sectionId, topicId, titleOverride]);
 
   const minutes =
-    mode === 'control' && sectionId ? (getSection(grade, sectionId)?.controlMinutes ?? 30) : null;
+    mode === 'control' && sectionId && grade
+      ? (getSection(grade, sectionId)?.controlMinutes ?? 30)
+      : null;
 
   const [index, setIndex] = useState(0);
   const [drafts, setDrafts] = useState<Draft[]>(() => questions.map(emptyDraft));

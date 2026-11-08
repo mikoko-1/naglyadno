@@ -133,16 +133,35 @@ export type ControlSpec = {
   questionIds: string[];
 };
 
+export type AppMode =
+  | 'year'
+  | 'plan'
+  | 'lessons'
+  | 'exam'
+  | 'radar'
+  | 'parent'
+  | 'account';
+
+export type ProductId = 'math';
+
 export type RouteState =
   | { view: 'home' }
   | { view: 'catalog'; grade: GradeId }
   | { view: 'topic'; grade: GradeId; topicId: string }
-  | { view: 'lesson'; grade: GradeId; topicId: string }
+  | { view: 'lesson'; grade: GradeId; topicId: string; yearWeek?: number }
   | { view: 'trainer'; grade: GradeId; topicId: string }
+  | { view: 'exam'; grade?: GradeId; yearWeek?: number }
+  | { view: 'radar'; yearWeek?: number }
+  | { view: 'plan' }
+  | { view: 'year'; grade: GradeId }
+  | { view: 'parent' }
+  | { view: 'account' }
+  | { view: 'legal'; doc: 'offer' | 'privacy' | 'contacts' }
   | {
       view: 'quiz';
       grade: GradeId;
       mode: 'practice' | 'test' | 'control';
       topicId?: string;
       sectionId?: string;
+      yearWeek?: number;
     };

@@ -6,22 +6,32 @@ import {
   CircleCheck,
   CircleExclamationPoint,
   Gamepad2,
+  ScanSearch,
+  FlaskConical,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { getTopic, type GradeId } from '../../curriculum/index.ts';
-import type { LessonStep, Question } from '../../curriculum/types.ts';
+import type { Lesson, LessonStep, Question } from '../../curriculum/types.ts';
 import { getLesson } from '../../content/lessons/index.ts';
 import { checkQuestionAnswer, formatAnswer } from '../../lib/quiz/checkAnswer.ts';
+import { FormulaXRay } from '../interactives/FormulaXRay.tsx';
+import { StressTestSandbox } from '../interactives/StressTestSandbox.tsx';
 import { LessonInteractPanel } from './LessonInteractPanel.tsx';
 import { LessonVisuals } from './LessonVisuals.tsx';
 
 type LessonRunnerProps = {
-  grade: GradeId;
+  grade?: GradeId;
   topicId: string;
+  lessonOverride?: Lesson;
+  titleOverride?: string;
   onExit: () => void;
   onComplete: () => void;
   onOpenTrainer?: () => void;
+  dark?: boolean;
+  hideExtraTabs?: boolean;
 };
+
+type LessonTab = 'steps' | 'xray' | 'sandbox';
 
 function stepKindLabel(kind: LessonStep['kind']): string {
   if (kind === 'concept') return 'Идея';
@@ -31,9 +41,26 @@ function stepKindLabel(kind: LessonStep['kind']): string {
   return 'Итог';
 }
 
-export function LessonRunner({ grade, topicId, onExit, onComplete, onOpenTrainer }: LessonRunnerProps) {
-  const lesson = getLesson(topicId);
-  const topic = getTopic(grade, topicId)?.topic;
+export function LessonRunner({
+  grade,
+  topicId,
+  lessonOverride,
+  titleOverride,
+  onExit,
+  onComplete,
+  onOpenTrainer,
+  dark = false,
+  hideExtraTabs = false,
+}: LessonRunnerProps) {
+  const lesson = lessonOverride ?? getLesson(topicId);
+  const mathTopic = grade ? getTopic(grade, topicId)?.topic : undefined;
+  const topic = mathTopic ?? {
+    id: topicId,
+    title: titleOverride ?? topicId,
+    goal: titleOverride ?? '',
+    hasTrainer: false,
+  };
+  const [tab, setTab] = useState<LessonTab>('steps');
   const [stepIndex, setStepIndex] = useState(0);
   const [draft, setDraft] = useState<string | string[]>('');
   const [checked, setChecked] = useState<boolean | null>(null);
@@ -46,7 +73,7 @@ export function LessonRunner({ grade, topicId, onExit, onComplete, onOpenTrainer
     [stepIndex, steps.length],
   );
 
-  if (!lesson || !step || !topic) {
+  if (!lesson || !step) {
     return (
       <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm font-bold text-amber-900">
         Урок для этой темы пока не собран.
@@ -114,36 +141,102 @@ export function LessonRunner({ grade, topicId, onExit, onComplete, onOpenTrainer
 
   const needsCheck = step.kind === 'try' || step.kind === 'interact';
 
+  const tabs: Array<{ id: LessonTab; label: string; icon: typeof ScanSearch }> = hideExtraTabs
+    ? [{ id: 'steps', label: 'Шаги', icon: BookOpenCheck }]
+    : [
+        { id: 'steps', label: 'Шаги', icon: BookOpenCheck },
+        { id: 'xray', label: 'Рентген', icon: ScanSearch },
+        { id: 'sandbox', label: 'Песочница', icon: FlaskConical },
+      ];
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <button
           type="button"
           onClick={onExit}
-          className="inline-flex items-center gap-2 text-sm font-extrabold text-slate-600 hover:text-indigo-700"
+          className={`inline-flex items-center gap-2 text-sm font-semibold ${
+            dark ? 'text-slate-400 hover:text-indigo-300' : 'text-slate-600 hover:text-indigo-700'
+          }`}
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
           К теме
         </button>
-        <p className="text-xs font-extrabold tracking-wide text-slate-400 uppercase">{progressLabel}</p>
+        {tab === 'steps' && (
+          <p className={`text-xs font-semibold tracking-wide uppercase ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+            {progressLabel}
+          </p>
+        )}
       </div>
 
+      <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
+        {tabs.map((item) => {
+          const Icon = item.icon;
+          const active = tab === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setTab(item.id)}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
+                active
+                  ? 'bg-indigo-600 text-white'
+                  : dark
+                    ? 'bg-white/5 text-slate-300 ring-1 ring-white/10'
+                    : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              <Icon className="size-3.5" aria-hidden="true" />
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === 'xray' && (
+        <section
+          className={`rounded-3xl border p-5 shadow-sm sm:p-6 ${
+            dark ? 'border-white/10 bg-slate-900/80' : 'border-slate-200/80 bg-white'
+          }`}
+        >
+          <FormulaXRay dark={dark} />
+        </section>
+      )}
+
+      {tab === 'sandbox' && (
+        <section
+          className={`rounded-3xl border p-5 shadow-sm sm:p-6 ${
+            dark ? 'border-white/10 bg-slate-900/80' : 'border-slate-200/80 bg-white'
+          }`}
+        >
+          <StressTestSandbox dark={dark} />
+        </section>
+      )}
+
+      {tab === 'steps' && (
+        <>
       <div className="flex gap-1.5">
         {steps.map((item, index) => (
           <span
             key={item.id}
-            className={`h-1.5 flex-1 rounded-full ${index <= stepIndex ? 'bg-indigo-600' : 'bg-slate-200'}`}
+            className={`h-1.5 flex-1 rounded-full ${index <= stepIndex ? 'bg-indigo-600' : dark ? 'bg-white/10' : 'bg-slate-200'}`}
           />
         ))}
       </div>
 
-      <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
+      <section
+        className={`rounded-3xl border p-5 shadow-sm sm:p-6 ${
+          dark ? 'border-white/10 bg-slate-900/80 text-slate-100' : 'border-slate-200/80 bg-white'
+        }`}
+      >
         <p className="text-xs font-extrabold tracking-wide text-indigo-600 uppercase">{stepKindLabel(step.kind)}</p>
         <h2 className="mt-1 text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">{step.title}</h2>
 
         {(step.kind === 'concept' || step.kind === 'example' || step.kind === 'summary') && (
           <>
-            <p className="mt-3 text-sm leading-relaxed font-semibold text-slate-700 sm:text-base">{step.body}</p>
+            <p className="mt-3 whitespace-pre-line text-sm leading-relaxed font-semibold text-slate-700 sm:text-base">
+              {step.body}
+            </p>
             <LessonVisuals visual={step.visual} />
             {step.trainerCta && onOpenTrainer && (
               <button
@@ -263,12 +356,14 @@ export function LessonRunner({ grade, topicId, onExit, onComplete, onOpenTrainer
             <ArrowRight className="size-4" aria-hidden="true" />
           </button>
           {needsCheck && checked === false && (
-            <p className="mt-2 text-xs font-bold text-slate-500">
+            <p className={`mt-2 text-xs font-bold ${dark ? 'text-slate-500' : 'text-slate-500'}`}>
               Можно идти дальше — важно понять разбор, а не «угадать с первого раза».
             </p>
           )}
         </div>
       </section>
+        </>
+      )}
     </div>
   );
 }

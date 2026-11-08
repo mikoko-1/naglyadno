@@ -1,119 +1,11 @@
 import { allTopics, CURRICULUM } from '../../curriculum/index.ts';
 import type { GradeId, Question } from '../../curriculum/types.ts';
 import { bank, input, multi, single } from '../q.ts';
+import { buildKindBank, padBank } from './kindBanks.ts';
 
-function hashTopic(topicId: string): number {
-  let h = 0;
-  for (let i = 0; i < topicId.length; i += 1) h = (h * 31 + topicId.charCodeAt(i)) >>> 0;
-  return h;
-}
-
-/** Банк из вычислимых заданий: числа зависят от topicId, чтобы темы не копировали друг друга. */
+/** Тематический банк: задания по типу темы, не общие a+b. */
 function topicBank(topicId: string, title: string): { practice: Question[]; test: Question[] } {
-  const tag = topicId;
-  const h = hashTopic(topicId);
-  const a = 3 + (h % 9);
-  const b = 2 + ((h >> 3) % 8);
-  const c = 4 + ((h >> 6) % 7);
-  const d = 5 + ((h >> 9) % 6);
-
-  const practice = bank(
-    input({
-      id: `${tag}-p1`,
-      prompt: `«${title}»: вычисли ${a} + ${b}`,
-      answer: String(a + b),
-      explanation: `${a} + ${b} = ${a + b}.`,
-      difficulty: 'легко',
-    }),
-    input({
-      id: `${tag}-p2`,
-      prompt: `Вычисли ${a} × ${b}`,
-      answer: String(a * b),
-      explanation: `${a} × ${b} = ${a * b}.`,
-      difficulty: 'легко',
-    }),
-    input({
-      id: `${tag}-p3`,
-      prompt: `Вычисли ${a * b + c} − ${c}`,
-      answer: String(a * b),
-      explanation: `Сначала сумма в уме, затем вычитание: ответ ${a * b}.`,
-      difficulty: 'средне',
-    }),
-    input({
-      id: `${tag}-p4`,
-      prompt: `Найди ${b}% от ${a * 20}`,
-      answer: String((b * a * 20) / 100),
-      explanation: `${b}% от ${a * 20} = ${(b * a * 20) / 100}.`,
-      difficulty: 'средне',
-    }),
-    input({
-      id: `${tag}-p5`,
-      prompt: `Реши: x + ${a} = ${a + d}. Чему равен x?`,
-      answer: String(d),
-      explanation: `x = ${d}.`,
-      difficulty: 'легко',
-    }),
-    input({
-      id: `${tag}-p6`,
-      prompt: `Реши: ${b}x = ${b * c}. x = ?`,
-      answer: String(c),
-      explanation: `x = ${c}.`,
-      difficulty: 'легко',
-    }),
-    input({
-      id: `${tag}-p7`,
-      prompt: `Площадь прямоугольника ${a}×${d}`,
-      answer: String(a * d),
-      explanation: `S = ${a * d}.`,
-      difficulty: 'легко',
-    }),
-    input({
-      id: `${tag}-p8`,
-      prompt: `Упрости дробь: ${b}/${b * 2} (как десятичную 0.?)`,
-      answer: '0.5',
-      explanation: `${b}/${b * 2} = 1/2 = 0,5.`,
-      difficulty: 'средне',
-    }),
-    multi({
-      id: `${tag}-p9`,
-      prompt: 'Отметь верные равенства.',
-      options: [`${a}+${a}=${2 * a}`, `${b}×0=0`, `${c}−${c}=1`, `${d}÷${d}=1`],
-      answer: [`${a}+${a}=${2 * a}`, `${b}×0=0`, `${d}÷${d}=1`],
-      explanation: `${c}−${c}=0, а не 1.`,
-      difficulty: 'средне',
-    }),
-    input({
-      id: `${tag}-p10`,
-      prompt: `НОД(${a * 2}, ${a * 3})`,
-      answer: String(a),
-      explanation: `НОД(${a * 2}, ${a * 3}) = ${a}.`,
-      difficulty: 'сложнее',
-    }),
-  );
-
-  const test = bank(
-    input({ id: `${tag}-t1`, prompt: `Тест «${title}»: ${a + 5} + ${b + 3}`, answer: String(a + b + 8), explanation: `${a + 5}+${b + 3}=${a + b + 8}.`, difficulty: 'легко' }),
-    input({ id: `${tag}-t2`, prompt: `Вычисли ${c} × ${d}`, answer: String(c * d), explanation: `${c * d}.`, difficulty: 'легко' }),
-    input({ id: `${tag}-t3`, prompt: `Вычисли ${(c * d) * b} ÷ ${b}`, answer: String(c * d), explanation: `${c * d}.`, difficulty: 'средне' }),
-    input({ id: `${tag}-t4`, prompt: `10% от ${a * 50}`, answer: String(a * 5), explanation: `${a * 5}.`, difficulty: 'легко' }),
-    input({ id: `${tag}-t5`, prompt: `Реши: ${a}x − ${a} = ${a * (b - 1)}. x = ?`, answer: String(b), explanation: `${a}(x−1)=${a * (b - 1)} → x−1=${b - 1} → x=${b}.`, difficulty: 'сложнее' }),
-    input({ id: `${tag}-t6`, prompt: `Периметр квадрата со стороной ${c}`, answer: String(4 * c), explanation: `4×${c}=${4 * c}.`, difficulty: 'легко' }),
-    input({ id: `${tag}-t7`, prompt: `Вычисли ${a}.5 + 0.5`, answer: String(a + 1), explanation: `${a}.5 + 0.5 = ${a + 1}.`, difficulty: 'легко' }),
-    single({
-      id: `${tag}-t8`,
-      prompt: `В теме «${title}» верный подход — это…`,
-      options: ['Опираться на определение и проверку', 'Угадывать без условия', 'Игнорировать знаки', 'Делить всегда на ноль'],
-      answer: 'Опираться на определение и проверку',
-      explanation: 'Смысл темы важнее заучивания одного примера.',
-      difficulty: 'легко',
-    }),
-    input({ id: `${tag}-t9`, prompt: `Сумма углов ${30 + a}° и ${60 - (a % 5)}°`, answer: String(30 + a + 60 - (a % 5)), explanation: 'Складываем градусы.', difficulty: 'средне' }),
-    input({ id: `${tag}-t10`, prompt: `Модуль числа −${a + d}`, answer: String(a + d), explanation: `|−${a + d}| = ${a + d}.`, difficulty: 'легко' }),
-    input({ id: `${tag}-t11`, prompt: `Среднее арифметическое ${a} и ${a + 2 * b}`, answer: String(a + b), explanation: `(${a}+${a + 2 * b})/2 = ${a + b}.`, difficulty: 'средне' }),
-    input({ id: `${tag}-t12`, prompt: `Сколько градусов в развёрнутом угле?`, answer: '180', explanation: '180°.', difficulty: 'легко' }),
-  );
-
-  return { practice, test };
+  return buildKindBank(topicId, title);
 }
 
 /** Тематические оверрайды — более точные задания поверх общего шаблона. */
@@ -267,16 +159,13 @@ const SPECIAL: Record<string, { practice: Question[]; test: Question[] }> = {
 export function buildAllQuestionBanks(
   authored: Record<string, { practice: Question[]; test: Question[] }>,
 ): Record<string, { practice: Question[]; test: Question[] }> {
-  const result: Record<string, { practice: Question[]; test: Question[] }> = { ...authored };
+  const result: Record<string, { practice: Question[]; test: Question[] }> = {};
 
   for (const grade of CURRICULUM) {
     for (const topic of allTopics(grade.id)) {
-      if (result[topic.id]) continue;
-      if (SPECIAL[topic.id]) {
-        result[topic.id] = SPECIAL[topic.id];
-        continue;
-      }
-      result[topic.id] = topicBank(topic.id, topic.title);
+      const base =
+        authored[topic.id] ?? SPECIAL[topic.id] ?? topicBank(topic.id, topic.title);
+      result[topic.id] = padBank(base, topic.id, topic.title);
     }
   }
 
