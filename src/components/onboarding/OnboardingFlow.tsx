@@ -150,7 +150,7 @@ export function OnboardingFlow({ account, skills, dark, onDone }: OnboardingFlow
     <section className={`mx-auto max-w-lg space-y-5 rounded-3xl border p-5 sm:p-6 ${card}`}>
       <div>
         <p className="text-xs font-semibold tracking-wide text-indigo-500 uppercase">60 секунд · старт</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">Сначала поймём, где дыры</h1>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight">Сначала поймём, где пробелы</h1>
         <p className={`mt-2 text-sm ${dark ? 'text-slate-400' : 'text-slate-600'}`}>
           5 коротких задач → персональный план. Без регистрации на сервере: аккаунт хранится на этом устройстве (облако — в Плюс).
         </p>
