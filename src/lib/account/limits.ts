@@ -1,75 +1,73 @@
 import {
-  effectivePlan,
+  hasFullAccess,
+  isTrialActive,
+  trialDaysLeft,
   type AccountState,
   type PlanId,
 } from './storage.ts';
 
-export type LimitKind = 'socrates' | 'exam' | 'surgical' | 'parentReport' | 'cloud';
+export type LimitKind = 'socrates' | 'exam' | 'surgical' | 'parentReport' | 'cloud' | 'app';
 
-const FREE_SOCRATES_PER_DAY = 5;
-const FREE_EXAMS_PER_DAY = 1;
+const LOCKED =
+  'Пробный период закончился. Оформи Плюс, чтобы продолжить учиться.';
 
 export function canUse(
   account: AccountState,
   kind: LimitKind,
 ): { ok: boolean; reason?: string; planNeeded?: PlanId } {
-  const plan = effectivePlan(account);
-
-  if (kind === 'surgical') {
-    if (plan === 'free') {
-      return {
-        ok: false,
-        reason: 'Хирургический тест по слабым местам — в тарифе Плюс.',
-        planNeeded: 'plus',
-      };
-    }
-    return { ok: true };
-  }
-
-  if (kind === 'parentReport') {
-    if (plan === 'free') {
-      return {
-        ok: false,
-        reason: 'Полный отчёт родителю и план на неделю — в тарифе Плюс.',
-        planNeeded: 'plus',
-      };
-    }
-    return { ok: true };
-  }
-
   if (kind === 'cloud') {
-    // Облако через Supabase доступно после входа на любом тарифе.
+    // Вход и синк доступны всегда — чтобы после оплаты подтянуть профиль.
     return { ok: true };
+  }
+
+  if (hasFullAccess(account)) return { ok: true };
+
+  if (kind === 'app') {
+    return { ok: false, reason: LOCKED, planNeeded: 'plus' };
   }
 
   if (kind === 'socrates') {
-    if (plan !== 'free') return { ok: true };
-    if (account.usage.socratesMessages >= FREE_SOCRATES_PER_DAY) {
-      return {
-        ok: false,
-        reason: `На Стартe — ${FREE_SOCRATES_PER_DAY} сообщений Сократу в день. Завтра снова или открой Плюс.`,
-        planNeeded: 'plus',
-      };
-    }
-    return { ok: true };
+    return {
+      ok: false,
+      reason: LOCKED,
+      planNeeded: 'plus',
+    };
   }
 
-  if (kind === 'exam') {
-    if (plan !== 'free') return { ok: true };
-    if (account.usage.examStarts >= FREE_EXAMS_PER_DAY) {
-      return {
-        ok: false,
-        reason: `На Старте — ${FREE_EXAMS_PER_DAY} контрольная в день. Плюс снимает лимит.`,
-        planNeeded: 'plus',
-      };
-    }
-    return { ok: true };
+  if (kind === 'exam' || kind === 'surgical') {
+    return { ok: false, reason: LOCKED, planNeeded: 'plus' };
   }
 
-  return { ok: true };
+  if (kind === 'parentReport') {
+    return {
+      ok: false,
+      reason: 'Отчёт родителю доступен в пробный период и на Плюс.',
+      planNeeded: 'plus',
+    };
+  }
+
+  return { ok: false, reason: LOCKED, planNeeded: 'plus' };
 }
 
+/** Сколько сообщений Сократа осталось (null = без лимита). */
 export function socratesLeft(account: AccountState): number | null {
-  if (effectivePlan(account) !== 'free') return null;
-  return Math.max(0, FREE_SOCRATES_PER_DAY - account.usage.socratesMessages);
+  if (!hasFullAccess(account)) return 0;
+  if (isTrialActive(account)) {
+    const d = trialDaysLeft(account);
+    // во время триала без дневного лимита; показываем дни триала в UI отдельно
+    void d;
+    return null;
+  }
+  return null;
+}
+
+export function accessBadge(account: AccountState): string {
+  if (hasFullAccess(account) && !isTrialActive(account) && account.plan === 'plus') {
+    return 'Плюс';
+  }
+  if (isTrialActive(account)) {
+    const d = trialDaysLeft(account);
+    return d === 1 ? 'Пробный · 1 день' : `Пробный · ${d} дн.`;
+  }
+  return 'Нужен Плюс';
 }

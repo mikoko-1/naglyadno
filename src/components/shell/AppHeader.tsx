@@ -14,8 +14,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { GRADE_IDS, type AppMode, type GradeId } from '../../curriculum/index.ts';
-import { effectivePlan, type AccountState } from '../../lib/account/storage.ts';
-import { socratesLeft } from '../../lib/account/limits.ts';
+import type { AccountState } from '../../lib/account/storage.ts';
+import { accessBadge, socratesLeft } from '../../lib/account/limits.ts';
 
 type AppHeaderProps = {
   subtitle: string;
@@ -56,7 +56,7 @@ export function AppHeader({
   onHome,
   onModeChange,
 }: AppHeaderProps) {
-  const plan = effectivePlan(account);
+  const badge = accessBadge(account);
   const left = socratesLeft(account);
   const visibleModes = MODES;
 
@@ -83,14 +83,16 @@ export function AppHeader({
           <div className="flex shrink-0 items-center gap-2">
             <span
               className={`hidden rounded-full px-2.5 py-1 text-[11px] font-semibold sm:inline ${
-                plan === 'free'
-                  ? dark
-                    ? 'bg-white/5 text-slate-400'
-                    : 'bg-slate-100 text-slate-600'
-                  : 'bg-indigo-500/15 text-indigo-500'
+                badge.startsWith('Плюс')
+                  ? 'bg-indigo-500/15 text-indigo-500'
+                  : badge.startsWith('Пробный')
+                    ? 'bg-emerald-500/15 text-emerald-600'
+                    : dark
+                      ? 'bg-white/5 text-slate-400'
+                      : 'bg-slate-100 text-slate-600'
               }`}
             >
-              {plan === 'free' ? 'Старт' : 'Плюс'}
+              {badge}
               {left !== null ? ` · Сократ ${left}` : ''}
             </span>
             <div

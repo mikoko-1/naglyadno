@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AccountPanel } from './components/account/AccountPanel.tsx';
 import { PaywallModal } from './components/billing/PaywallModal.tsx';
+import { TrialLockedView } from './components/billing/TrialLockedView.tsx';
 import { InfiniteExamGenerator } from './components/exam/InfiniteExamGenerator.tsx';
 import { LessonRunner } from './components/lesson/LessonRunner.tsx';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow.tsx';
@@ -31,6 +32,8 @@ import {
   bumpExamStart,
   bumpSocrates,
   defaultAccount,
+  ensureTrialStarted,
+  hasFullAccess,
   loadAccount,
   logActivity,
   saveAccount,
@@ -103,7 +106,7 @@ export default function App() {
   const [route, setRoute] = useState<RouteState>({ view: 'home' });
   const [progress, setProgress] = useState<ProgressState>(() => loadProgress());
   const [skills, setSkills] = useState<SkillsState>(() => loadSkills());
-  const [account, setAccount] = useState<AccountState>(() => loadAccount());
+  const [account, setAccount] = useState<AccountState>(() => ensureTrialStarted(loadAccount()));
   const [yearProgress, setYearProgress] = useState<YearProgressState>(() => loadYearProgress());
   const [theme, setTheme] = useState<Theme>(() => loadTheme());
   const [socratesOpen, setSocratesOpen] = useState(false);
@@ -116,6 +119,8 @@ export default function App() {
 
   const dark = theme === 'dark';
   const mode = modeFromRoute(route);
+  const fullAccess = hasFullAccess(account);
+  const accessLocked = account.onboardingDone && !fullAccess;
 
   const activeGrade: GradeId | undefined = useMemo(() => {
     if (route.view === 'exam') return route.grade ?? account.grade;
@@ -212,9 +217,10 @@ export default function App() {
 
   const persistAccount = useCallback(
     (next: AccountState) => {
-      setAccount(next);
-      saveAccount(next);
-      scheduleCloudPush({ account: next, progress, year: yearProgress });
+      const stamped = ensureTrialStarted(next);
+      setAccount(stamped);
+      saveAccount(stamped);
+      scheduleCloudPush({ account: stamped, progress, year: yearProgress });
     },
     [progress, yearProgress],
   );
@@ -282,6 +288,11 @@ export default function App() {
   }
 
   function handleModeChange(next: AppMode) {
+    if (accessLocked && next !== 'account') {
+      openPaywall('Пробный период закончился — нужен Плюс');
+      setRoute({ view: 'account' });
+      return;
+    }
     if (next === 'year') {
       setRoute({ view: 'year', grade: account.grade || activeGrade || 6 });
       return;
@@ -420,18 +431,28 @@ export default function App() {
       />
 
       <main className="relative mx-auto w-full max-w-5xl px-4 py-5 pb-8 sm:px-6 sm:py-8">
-        {route.view === 'home' && <HomeView progress={progress} onOpenGrade={openGrade} />}
-
         {route.view === 'legal' && (
           <LegalDocView
             doc={route.doc}
             dark={dark}
-            onBack={() => setRoute({ view: 'home' })}
+            onBack={() => setRoute({ view: accessLocked ? 'account' : 'home' })}
             onOpenDoc={openLegal}
           />
         )}
 
-        {route.view === 'year' && (
+        {accessLocked && route.view !== 'account' && route.view !== 'legal' && (
+          <TrialLockedView
+            dark={dark}
+            onPay={() => openPaywall('Пробный период закончился — оформи Плюс')}
+            onAccount={() => setRoute({ view: 'account' })}
+          />
+        )}
+
+        {!accessLocked && route.view === 'home' && (
+          <HomeView progress={progress} onOpenGrade={openGrade} />
+        )}
+
+        {!accessLocked && route.view === 'year' && (
           <YearTrackView
             grade={route.grade}
             yearProgress={yearProgress}
@@ -474,7 +495,7 @@ export default function App() {
           />
         )}
 
-        {route.view === 'plan' && (
+        {!accessLocked && route.view === 'plan' && (
           <DailyPlanView
             account={account}
             skills={skills}
@@ -486,7 +507,7 @@ export default function App() {
           />
         )}
 
-        {route.view === 'parent' && (
+        {!accessLocked && route.view === 'parent' && (
           <ParentReportView
             account={account}
             skills={skills}
@@ -503,7 +524,7 @@ export default function App() {
             dark={dark}
             onAccountChange={persistAccount}
             onCloudPulled={(bundle) => {
-              setAccount(bundle.account);
+              setAccount(ensureTrialStarted(bundle.account));
               setProgress(bundle.progress);
               setYearProgress(bundle.year);
             }}
@@ -516,7 +537,7 @@ export default function App() {
           />
         )}
 
-        {route.view === 'exam' && (
+        {!accessLocked && route.view === 'exam' && (
           <InfiniteExamGenerator
             preferredGrade={route.grade ?? account.grade}
             dark={dark}
@@ -536,7 +557,7 @@ export default function App() {
           />
         )}
 
-        {route.view === 'radar' && (
+        {!accessLocked && route.view === 'radar' && (
           <WeakSpotsRadar
             skills={skills}
             dark={dark}
@@ -545,7 +566,7 @@ export default function App() {
           />
         )}
 
-        {route.view === 'catalog' && (
+        {!accessLocked && route.view === 'catalog' && (
           <CatalogView
             grade={route.grade}
             progress={progress}
@@ -556,7 +577,7 @@ export default function App() {
           />
         )}
 
-        {route.view === 'topic' && (
+        {!accessLocked && route.view === 'topic' && (
           <TopicHub
             grade={route.grade}
             topicId={route.topicId}
@@ -585,7 +606,7 @@ export default function App() {
           />
         )}
 
-        {route.view === 'lesson' && (
+        {!accessLocked && route.view === 'lesson' && (
           <LessonRunner
             grade={route.grade}
             topicId={route.topicId}
@@ -598,7 +619,7 @@ export default function App() {
           />
         )}
 
-        {route.view === 'trainer' && (
+        {!accessLocked && route.view === 'trainer' && (
           <div className="space-y-4">
             <button
               type="button"
@@ -623,7 +644,7 @@ export default function App() {
           </div>
         )}
 
-        {route.view === 'quiz' && (
+        {!accessLocked && route.view === 'quiz' && (
           <QuizRunner
             grade={route.grade}
             mode={route.mode}
@@ -647,7 +668,9 @@ export default function App() {
 
       <SiteFooter dark={dark} onOpenLegal={openLegal} />
 
-      {!socratesOpen && <SocratesFab dark={dark} onClick={() => openSocrates()} />}
+      {!accessLocked && !socratesOpen && (
+        <SocratesFab dark={dark} onClick={() => openSocrates()} />
+      )}
       <SocraticAITutor
         open={socratesOpen}
         onClose={() => {

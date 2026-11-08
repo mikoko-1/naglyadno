@@ -61,7 +61,8 @@ export function PaywallModal({
           <div>
             <h2 className="text-xl font-semibold tracking-tight">Наглядно · Плюс</h2>
             <p className={`mt-1 text-sm ${dark ? 'text-slate-400' : 'text-slate-600'}`}>
-              {reason ?? 'Безлимит Сократа, план на день и отчёт родителю.'}
+              {reason ??
+                'После 3 дней пробного периода нужен Плюс: уроки, Сократ, год и отчёт родителю.'}
             </p>
           </div>
           <button

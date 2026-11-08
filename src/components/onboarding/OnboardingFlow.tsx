@@ -6,6 +6,8 @@ import { checkQuestionAnswer } from '../../lib/quiz/checkAnswer.ts';
 import {
   logActivity,
   saveAccount,
+  startTrial,
+  TRIAL_DAYS,
   type AccountState,
 } from '../../lib/account/storage.ts';
 import {
@@ -82,7 +84,7 @@ export function OnboardingFlow({ account, skills, dark, onDone }: OnboardingFlow
       if (c !== null) baseline[meta.id] = c;
     }
 
-    let nextAccount: AccountState = {
+    let nextAccount: AccountState = startTrial({
       ...account,
       onboardingDone: true,
       grade,
@@ -90,7 +92,7 @@ export function OnboardingFlow({ account, skills, dark, onDone }: OnboardingFlow
       email: email.trim(),
       role,
       baseline,
-    };
+    });
     nextAccount = logActivity(nextAccount, {
       minutes: 8,
       attempts,
@@ -106,7 +108,8 @@ export function OnboardingFlow({ account, skills, dark, onDone }: OnboardingFlow
       <section className={`mx-auto max-w-lg rounded-3xl border p-6 ${card}`}>
         <h1 className="text-2xl font-semibold tracking-tight">Готово</h1>
         <p className={`mt-2 text-sm ${dark ? 'text-slate-400' : 'text-slate-600'}`}>
-          Собрали стартовый снимок. Дальше — план на сегодня и рост по радару.
+          Собрали стартовый снимок. У тебя {TRIAL_DAYS} дня полного доступа — потом нужен тариф
+          Плюс.
         </p>
       </section>
     );

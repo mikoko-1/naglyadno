@@ -36,12 +36,16 @@ export type AccountState = {
   plan: PlanId;
   /** ISO date — конец оплаченного периода */
   planExpiresAt?: string;
+  /** ISO date — конец пробного периода (3 дня с онбординга) */
+  trialEndsAt?: string;
   /** Снимок уверенности после онбординга, % */
   baseline?: Partial<Record<MicroSkillId, number>>;
   usage: DayUsage;
   activity: ActivityDay[];
   lastSyncAt?: string;
 };
+
+export const TRIAL_DAYS = 3;
 
 const KEY = 'naglyadno-account-v1';
 
@@ -73,13 +77,15 @@ export function loadAccount(): AccountState {
     if (!raw) return defaultAccount();
     const parsed = JSON.parse(raw) as AccountState;
     if (parsed.version !== 1) return defaultAccount();
-    return refreshUsageDay({
-      ...defaultAccount(),
-      ...parsed,
-      plan: normalizePlanId(parsed.plan),
-      usage: parsed.usage ?? emptyUsage(),
-      activity: parsed.activity ?? [],
-    });
+    return ensureTrialStarted(
+      refreshUsageDay({
+        ...defaultAccount(),
+        ...parsed,
+        plan: normalizePlanId(parsed.plan),
+        usage: parsed.usage ?? emptyUsage(),
+        activity: parsed.activity ?? [],
+      }),
+    );
   } catch {
     return defaultAccount();
   }
@@ -106,9 +112,44 @@ export function isPlanActive(state: AccountState): boolean {
   return new Date(state.planExpiresAt).getTime() > Date.now();
 }
 
+export function isTrialActive(state: AccountState): boolean {
+  if (!state.trialEndsAt) return false;
+  return new Date(state.trialEndsAt).getTime() > Date.now();
+}
+
+/** Полный доступ: оплаченный Плюс или активный пробный период. */
+export function hasFullAccess(state: AccountState): boolean {
+  return isPlanActive(state) || isTrialActive(state);
+}
+
 export function effectivePlan(state: AccountState): PlanId {
-  if (!isPlanActive(state)) return 'free';
-  return state.plan;
+  if (isPlanActive(state)) return state.plan;
+  return 'free';
+}
+
+export function trialDaysLeft(state: AccountState): number | null {
+  if (!isTrialActive(state) || !state.trialEndsAt) return null;
+  const ms = new Date(state.trialEndsAt).getTime() - Date.now();
+  return Math.max(0, Math.ceil(ms / (24 * 60 * 60 * 1000)));
+}
+
+/** Старт пробных 3 дней (один раз). */
+export function startTrial(state: AccountState): AccountState {
+  if (state.trialEndsAt) return state;
+  const ends = new Date();
+  ends.setDate(ends.getDate() + TRIAL_DAYS);
+  return { ...state, trialEndsAt: ends.toISOString() };
+}
+
+/**
+ * Если онбординг уже пройден, а trial ещё не ставили — запускаем 3 дня
+ * (миграция старых локальных аккаунтов).
+ */
+export function ensureTrialStarted(state: AccountState): AccountState {
+  if (!state.onboardingDone) return state;
+  if (state.trialEndsAt) return state;
+  if (isPlanActive(state)) return state;
+  return startTrial(state);
 }
 
 export const PLAN_META: Record<
@@ -116,15 +157,19 @@ export const PLAN_META: Record<
   { title: string; price: string; blurb: string; perks: string[] }
 > = {
   free: {
-    title: 'Старт',
-    price: '0 ₽',
-    blurb: 'Понять продукт',
-    perks: ['Уроки 5–9', '5 сообщений Сократу / день', '1 экспресс-срез / день', 'Базовый радар'],
+    title: 'Пробный',
+    price: '3 дня бесплатно',
+    blurb: 'Полный доступ на старте',
+    perks: [
+      '3 дня всего Наглядно без ограничений',
+      'Потом нужен тариф Плюс',
+      'Оферта и вход остаются доступны',
+    ],
   },
   plus: {
     title: 'Плюс',
     price: '690 ₽/мес',
-    blurb: '9 месяцев: 36 недель темпа + отчёты',
+    blurb: 'Полный доступ после пробного периода',
     perks: [
       'Трек на весь учебный год (36 недель)',
       'Безлимит Сократа и срезов',
