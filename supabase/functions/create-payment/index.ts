@@ -1,8 +1,8 @@
-// Создаёт платёж ЮKassa на Плюс (690 ₽ / 30 дней).
-// Secrets: YOOKASSA_SHOP_ID, YOOKASSA_SECRET_KEY
-// Авто: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+// Создаёт платёжную ссылку Робокассы на Плюс (690 ₽ / 30 дней).
+// Secrets: ROBOKASSA_LOGIN, ROBOKASSA_PASSWORD1, опционально ROBOKASSA_IS_TEST=1
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
+import md5 from 'https://esm.sh/js-md5@0.8.3';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -18,10 +18,13 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const shopId = Deno.env.get('YOOKASSA_SHOP_ID');
-    const secret = Deno.env.get('YOOKASSA_SECRET_KEY');
-    if (!shopId || !secret) {
-      return json({ error: 'ЮKassa ещё не настроена (YOOKASSA_SHOP_ID / YOOKASSA_SECRET_KEY)' }, 503);
+    const login = Deno.env.get('ROBOKASSA_LOGIN');
+    const pass1 = Deno.env.get('ROBOKASSA_PASSWORD1');
+    if (!login || !pass1) {
+      return json(
+        { error: 'Робокасса ещё не настроена (ROBOKASSA_LOGIN / ROBOKASSA_PASSWORD1)' },
+        503,
+      );
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -41,62 +44,38 @@ Deno.serve(async (req) => {
     if (userErr || !userData.user) return json({ error: 'Нужен вход' }, 401);
     const user = userData.user;
 
-    const body = await req.json().catch(() => ({}));
-    const returnUrl =
-      typeof body.returnUrl === 'string' && /^https?:\/\//i.test(body.returnUrl)
-        ? body.returnUrl
-        : Deno.env.get('SITE_URL')
-          ? `${Deno.env.get('SITE_URL')}/?paid=1`
-          : null;
-    if (!returnUrl) return json({ error: 'Не указан returnUrl' }, 400);
+    const invId = Math.floor(Date.now() / 1000) % 2_000_000_000;
+    const shpUser = user.id.replace(/-/g, '');
+    const signature = md5(`${login}:${PLUS_AMOUNT}:${invId}:${pass1}:Shp_user=${shpUser}`);
 
-    const idempotenceKey = crypto.randomUUID();
-    const ykRes = await fetch('https://api.yookassa.ru/v3/payments', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Idempotence-Key': idempotenceKey,
-        Authorization: `Basic ${btoa(`${shopId}:${secret}`)}`,
-      },
-      body: JSON.stringify({
-        amount: { value: PLUS_AMOUNT, currency: 'RUB' },
-        capture: true,
-        confirmation: { type: 'redirect', return_url: returnUrl },
-        description: `Наглядно · Плюс на ${PLUS_DAYS} дней`,
-        metadata: {
-          user_id: user.id,
-          plan: 'plus',
-          days: String(PLUS_DAYS),
-        },
-      }),
+    const isTest = Deno.env.get('ROBOKASSA_IS_TEST') === '1';
+    const params = new URLSearchParams({
+      MerchantLogin: login,
+      OutSum: PLUS_AMOUNT,
+      InvId: String(invId),
+      Description: `Наглядно · Плюс на ${PLUS_DAYS} дней`,
+      SignatureValue: signature,
+      Shp_user: shpUser,
+      Culture: 'ru',
+      Encoding: 'utf-8',
     });
+    if (isTest) params.set('IsTest', '1');
 
-    const yk = await ykRes.json();
-    if (!ykRes.ok) {
-      return json(
-        { error: String(yk?.description ?? yk?.message ?? 'Ошибка ЮKassa').slice(0, 240) },
-        502,
-      );
-    }
-
-    const confirmationUrl = yk?.confirmation?.confirmation_url as string | undefined;
-    if (!confirmationUrl || !yk.id) {
-      return json({ error: 'ЮKassa не вернула ссылку на оплату' }, 502);
-    }
+    const confirmationUrl = `https://auth.robokassa.ru/Merchant/Index.aspx?${params.toString()}`;
 
     const admin = createClient(supabaseUrl, serviceKey);
     await admin.from('payments').upsert({
-      id: yk.id,
+      id: `robokassa-${invId}`,
       user_id: user.id,
       plan: 'plus',
       amount_rub: Number(PLUS_AMOUNT),
       currency: 'RUB',
-      status: yk.status ?? 'pending',
-      raw: yk,
+      status: 'pending',
+      raw: { invId, shpUser, provider: 'robokassa' },
       updated_at: new Date().toISOString(),
     });
 
-    return json({ confirmationUrl, paymentId: yk.id });
+    return json({ confirmationUrl, paymentId: String(invId) });
   } catch (e) {
     return json({ error: String(e) }, 500);
   }

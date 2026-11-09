@@ -4,7 +4,7 @@ export type CreatePaymentResult =
   | { ok: true; confirmationUrl: string; paymentId: string }
   | { ok: false; error: string; needLogin?: boolean };
 
-/** Создаёт платёж Плюс через Edge Function → ЮKassa. */
+/** Создаёт платёж Плюс через Edge Function → Робокасса. */
 export async function createPlusPayment(): Promise<CreatePaymentResult> {
   const sb = getSupabase();
   if (!sb) {

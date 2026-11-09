@@ -1,11 +1,13 @@
-# Минимальный конфиг для деплоя функций.
-# Вебхук ЮKassa приходит без JWT пользователя — проверку JWT отключаем.
+# Вебхук Робокассы приходит без JWT пользователя.
 
-[functions.yookassa-webhook]
+[functions.robokassa-result]
 verify_jwt = false
 
 [functions.create-payment]
 verify_jwt = true
 
 [functions.socrates]
+verify_jwt = false
+
+[functions.yookassa-webhook]
 verify_jwt = false

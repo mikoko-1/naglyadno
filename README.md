@@ -19,7 +19,7 @@ npm run dev
 - **Бесконечная контрольная** — экспресс / полный / хирургия (Плюс)
 - **Радар** — микро-навыки
 - **Кабинет родителя** — недельный отчёт (Плюс)
-- **Аккаунт** — Старт / **Плюс 690 ₽/мес** (ЮKassa)
+- **Аккаунт** — 3 дня пробный / **Плюс 690 ₽/мес** (Робокасса)
 - **Облако (Supabase)** — вход и синк прогресса
 
 Без `.env` сайт работает на `localStorage`.
@@ -29,13 +29,13 @@ npm run dev
 1. Supabase Free → SQL Editor: [`001_init.sql`](supabase/migrations/001_init.sql), затем [`002_payments_plus_only.sql`](supabase/migrations/002_payments_plus_only.sql).
 2. Auth → Email.
 3. `.env`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_BASE_PATH=/`.
-4. Secrets Edge: `GEMINI_API_KEY`, позже `YOOKASSA_SHOP_ID` + `YOOKASSA_SECRET_KEY`.
-5. Функции: `socrates`, `create-payment`, `yookassa-webhook` (JWT off у вебхука).
+4. Secrets Edge: `GEMINI_API_KEY`, позже `ROBOKASSA_LOGIN` + `PASSWORD1/2`.
+5. Функции: `socrates`, `create-payment`, `robokassa-result` (JWT off у Result URL).
 
 ## Оплата
 
-Кнопка «Оплатить» → Edge `create-payment` → ЮKassa → вебхук выставляет `profiles.plan=plus` на 30 дней.  
-Ключи эквайринга только на сервере.
+Кнопка «Оплатить» → Edge `create-payment` → Робокасса → Result URL выставляет `profiles.plan=plus` на 30 дней.  
+Ключи только на сервере. Подробности: [`DEPLOY.md`](DEPLOY.md).
 
 ## Структура
 

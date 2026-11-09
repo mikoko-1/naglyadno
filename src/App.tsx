@@ -174,7 +174,7 @@ export default function App() {
     });
   }, []);
 
-  // Возврат с ЮKassa: ?paid=1 → подтянуть профиль и убрать параметр из URL
+  // Возврат с Робокассы (Success URL): ?paid=1 → подтянуть профиль
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('paid') !== '1') return;
