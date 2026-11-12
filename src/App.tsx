@@ -47,6 +47,7 @@ import {
   type ProgressState,
 } from './lib/progress/storage.ts';
 import { loadSkills, type MicroSkillId, type SkillsState } from './lib/skills/microSkills.ts';
+import { confirmRobokassaFromUrl } from './lib/billing/confirmRobokassa.ts';
 import {
   getSessionUserId,
   onAuthChange,
@@ -174,18 +175,24 @@ export default function App() {
     });
   }, []);
 
-  // Возврат с Робокассы (Success URL) — paid=1 или параметры OutSum/InvId
+  // Возврат с Робокассы: подтверждаем оплату (Result URL часто даёт 401 без JWT)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const fromRobokassa =
       params.get('paid') === '1' ||
-      (params.has('InvId') && params.has('OutSum'));
+      ((params.has('InvId') || params.has('inv_id')) &&
+        (params.has('OutSum') || params.has('out_summ')));
     if (!fromRobokassa) return;
 
     let cancelled = false;
     void (async () => {
       const id = await getSessionUserId();
       if (!id || cancelled) return;
+
+      if (params.has('InvId') || params.has('inv_id')) {
+        await confirmRobokassaFromUrl(params);
+      }
+
       for (let i = 0; i < 4 && !cancelled; i++) {
         const pulled = await pullCloudState();
         if (pulled) {
@@ -194,22 +201,32 @@ export default function App() {
           setYearProgress(pulled.year);
           if (pulled.account.plan === 'plus') break;
         }
-        await new Promise((r) => setTimeout(r, 1500));
+        await new Promise((r) => setTimeout(r, 1200));
       }
-      for (const key of [...params.keys()]) {
+
+      const clean = new URLSearchParams(params);
+      for (const key of [...clean.keys()]) {
         if (
           key === 'paid' ||
           key === 'OutSum' ||
+          key === 'out_summ' ||
           key === 'InvId' ||
+          key === 'inv_id' ||
           key === 'SignatureValue' ||
+          key === 'crc' ||
           key === 'Culture' ||
           key === 'IsTest' ||
+          key === 'PaymentMethod' ||
+          key === 'IncSum' ||
+          key === 'IncCurrLabel' ||
+          key === 'EMail' ||
+          key === 'Fee' ||
           key.startsWith('Shp_')
         ) {
-          params.delete(key);
+          clean.delete(key);
         }
       }
-      const qs = params.toString();
+      const qs = clean.toString();
       window.history.replaceState(
         {},
         '',

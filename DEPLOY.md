@@ -18,7 +18,8 @@
 3. Задеплоить функции:
    - `socrates`
    - `create-payment`
-   - `robokassa-result` (**Verify JWT = OFF**)
+   - `confirm-robokassa` (JWT ON — подтверждение с Success URL)
+   - `robokassa-result` (**Verify JWT = OFF**; если всё равно 401 — Плюс всё равно встанет через `confirm-robokassa`)
 4. В кабинете Робокассы:
    - **Result URL:** `https://ongbagumbavgqrpogauz.supabase.co/functions/v1/robokassa-result`
    - **Success URL:** `https://naglyadno-math.site/` (без `?…` — Робокасса сама добавит параметры)
