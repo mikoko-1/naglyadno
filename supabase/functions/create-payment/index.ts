@@ -1,8 +1,8 @@
 // Создаёт платёжную ссылку Робокассы на Плюс (690 ₽ / 30 дней).
 // Secrets: ROBOKASSA_LOGIN, ROBOKASSA_PASSWORD1, опционально ROBOKASSA_IS_TEST=1
 
+import { createHash } from 'node:crypto';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
-import md5 from 'https://esm.sh/js-md5@0.8.3';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -18,8 +18,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const login = Deno.env.get('ROBOKASSA_LOGIN');
-    const pass1 = Deno.env.get('ROBOKASSA_PASSWORD1');
+    const login = Deno.env.get('ROBOKASSA_LOGIN')?.trim();
+    const pass1 = Deno.env.get('ROBOKASSA_PASSWORD1')?.trim();
     if (!login || !pass1) {
       return json(
         { error: 'Робокасса ещё не настроена (ROBOKASSA_LOGIN / ROBOKASSA_PASSWORD1)' },
@@ -41,19 +41,23 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData.user) return json({ error: 'Нужен вход' }, 401);
+    if (userErr || !userData.user) {
+      return json({ error: 'Нужен вход (сессия недействительна)' }, 401);
+    }
     const user = userData.user;
 
     const invId = Math.floor(Date.now() / 1000) % 2_000_000_000;
     const shpUser = user.id.replace(/-/g, '');
-    const signature = md5(`${login}:${PLUS_AMOUNT}:${invId}:${pass1}:Shp_user=${shpUser}`);
+    const signature = createHash('md5')
+      .update(`${login}:${PLUS_AMOUNT}:${invId}:${pass1}:Shp_user=${shpUser}`)
+      .digest('hex');
 
     const isTest = Deno.env.get('ROBOKASSA_IS_TEST') === '1';
     const params = new URLSearchParams({
       MerchantLogin: login,
       OutSum: PLUS_AMOUNT,
       InvId: String(invId),
-      Description: `Наглядно · Плюс на ${PLUS_DAYS} дней`,
+      Description: `Naglyadno Plus ${PLUS_DAYS} days`,
       SignatureValue: signature,
       Shp_user: shpUser,
       Culture: 'ru',
@@ -64,7 +68,7 @@ Deno.serve(async (req) => {
     const confirmationUrl = `https://auth.robokassa.ru/Merchant/Index.aspx?${params.toString()}`;
 
     const admin = createClient(supabaseUrl, serviceKey);
-    await admin.from('payments').upsert({
+    const { error: payErr } = await admin.from('payments').upsert({
       id: `robokassa-${invId}`,
       user_id: user.id,
       plan: 'plus',
@@ -74,6 +78,9 @@ Deno.serve(async (req) => {
       raw: { invId, shpUser, provider: 'robokassa' },
       updated_at: new Date().toISOString(),
     });
+    if (payErr) {
+      return json({ error: `payments: ${payErr.message}` }, 500);
+    }
 
     return json({ confirmationUrl, paymentId: String(invId) });
   } catch (e) {

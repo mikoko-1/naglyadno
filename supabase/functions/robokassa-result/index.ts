@@ -1,17 +1,16 @@
 // Result URL Робокассы → активирует Плюс на 30 дней.
 // Secrets: ROBOKASSA_PASSWORD2
-// В кабинете Робокассы Result URL:
-//   https://ongbagumbavgqrpogauz.supabase.co/functions/v1/robokassa-result
-// Ответ должен быть: OK{InvId}
+// URL: https://ongbagumbavgqrpogauz.supabase.co/functions/v1/robokassa-result
+// Ответ: OK{InvId}
 
+import { createHash } from 'node:crypto';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
-import md5 from 'https://esm.sh/js-md5@0.8.3';
 
 const PLUS_DAYS = 30;
 
 Deno.serve(async (req) => {
   try {
-    const pass2 = Deno.env.get('ROBOKASSA_PASSWORD2');
+    const pass2 = Deno.env.get('ROBOKASSA_PASSWORD2')?.trim();
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     if (!pass2 || !supabaseUrl || !serviceKey) {
@@ -26,7 +25,7 @@ Deno.serve(async (req) => {
 
     if (req.method === 'POST') {
       const ct = req.headers.get('content-type') ?? '';
-      if (ct.includes('application/x-www-form-urlencoded')) {
+      if (ct.includes('application/x-www-form-urlencoded') || ct.includes('multipart/form-data')) {
         const form = await req.formData();
         outSum = String(form.get('OutSum') ?? outSum);
         invId = String(form.get('InvId') ?? invId);
@@ -39,12 +38,13 @@ Deno.serve(async (req) => {
       return new Response('bad request', { status: 400 });
     }
 
-    const expected = md5(`${outSum}:${invId}:${pass2}:Shp_user=${shpUser}`);
+    const expected = createHash('md5')
+      .update(`${outSum}:${invId}:${pass2}:Shp_user=${shpUser}`)
+      .digest('hex');
     if (expected.toLowerCase() !== signature.toLowerCase()) {
       return new Response('bad sign', { status: 400 });
     }
 
-    // uuid без дефисов → с дефисами
     const hex = shpUser.toLowerCase();
     if (hex.length !== 32) return new Response('bad user', { status: 400 });
     const userId = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;

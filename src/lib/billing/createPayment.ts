@@ -16,22 +16,33 @@ export async function createPlusPayment(): Promise<CreatePaymentResult> {
     return { ok: false, error: 'Сначала войди в аккаунт', needLogin: true };
   }
 
-  const returnUrl = `${window.location.origin}${window.location.pathname}?paid=1`;
-
   const { data, error } = await sb.functions.invoke('create-payment', {
-    body: { returnUrl },
+    body: {},
   });
 
-  if (error) {
-    return { ok: false, error: error.message || 'Не удалось создать платёж' };
-  }
-
   const payload = data as { confirmationUrl?: string; paymentId?: string; error?: string } | null;
+
   if (payload?.error) {
     return { ok: false, error: String(payload.error) };
   }
+
+  if (error) {
+    const msg = error.message || 'Не удалось создать платёж';
+    // Часто при 4xx/5xx тело лежит в data
+    if (payload && typeof payload === 'object') {
+      return {
+        ok: false,
+        error: `${msg}. Ответ: ${JSON.stringify(payload).slice(0, 200)}`,
+      };
+    }
+    return { ok: false, error: msg };
+  }
+
   if (!payload?.confirmationUrl) {
-    return { ok: false, error: 'Нет ссылки на оплату' };
+    return {
+      ok: false,
+      error: `Нет ссылки на оплату. Ответ сервера: ${JSON.stringify(payload).slice(0, 200)}`,
+    };
   }
 
   return {
