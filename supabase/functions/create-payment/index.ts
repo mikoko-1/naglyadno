@@ -1,5 +1,6 @@
-// Создаёт платёжную ссылку Робокассы на Плюс (690 ₽ / 30 дней).
+// Создаёт платёжную ссылку Робокассы на Плюс (690 ₽ / 30 дней) + Receipt для чека самозанятого.
 // Secrets: ROBOKASSA_LOGIN, ROBOKASSA_PASSWORD1, опционально ROBOKASSA_IS_TEST=1
+// Подпись с Receipt: MerchantLogin:OutSum:InvId:Receipt:Password1:Shp_user=...
 
 import { createHash } from 'node:crypto';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
@@ -10,6 +11,7 @@ const cors = {
 };
 
 const PLUS_AMOUNT = '690.00';
+const PLUS_SUM = 690.0;
 const PLUS_DAYS = 30;
 
 Deno.serve(async (req) => {
@@ -48,8 +50,27 @@ Deno.serve(async (req) => {
 
     const invId = Math.floor(Date.now() / 1000) % 2_000_000_000;
     const shpUser = user.id.replace(/-/g, '');
+
+    // Чек для ФНС / «Мой налог» (самозанятый). sno не передаём.
+    const receiptObj = {
+      items: [
+        {
+          name: 'Подписка Naglyadno Plus (30 дней)',
+          quantity: 1,
+          sum: PLUS_SUM,
+          payment_method: 'full_prepayment',
+          payment_object: 'service',
+          tax: 'none',
+        },
+      ],
+    };
+    // В подпись и в параметр Receipt идёт URL-encoded JSON
+    const receiptEncoded = encodeURIComponent(JSON.stringify(receiptObj));
+
     const signature = createHash('md5')
-      .update(`${login}:${PLUS_AMOUNT}:${invId}:${pass1}:Shp_user=${shpUser}`)
+      .update(
+        `${login}:${PLUS_AMOUNT}:${invId}:${receiptEncoded}:${pass1}:Shp_user=${shpUser}`,
+      )
       .digest('hex');
 
     const isTest = Deno.env.get('ROBOKASSA_IS_TEST') === '1';
@@ -59,6 +80,8 @@ Deno.serve(async (req) => {
       InvId: String(invId),
       Description: `Naglyadno Plus ${PLUS_DAYS} days`,
       SignatureValue: signature,
+      // URLSearchParams ещё раз закодирует % → %25 — так ожидает Робокасса в query
+      Receipt: receiptEncoded,
       Shp_user: shpUser,
       Culture: 'ru',
       Encoding: 'utf-8',
@@ -72,10 +95,10 @@ Deno.serve(async (req) => {
       id: `robokassa-${invId}`,
       user_id: user.id,
       plan: 'plus',
-      amount_rub: Number(PLUS_AMOUNT),
+      amount_rub: PLUS_SUM,
       currency: 'RUB',
       status: 'pending',
-      raw: { invId, shpUser, provider: 'robokassa' },
+      raw: { invId, shpUser, provider: 'robokassa', receipt: receiptObj },
       updated_at: new Date().toISOString(),
     });
     if (payErr) {
