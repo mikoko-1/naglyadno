@@ -174,30 +174,47 @@ export default function App() {
     });
   }, []);
 
-  // Возврат с Робокассы (Success URL): ?paid=1 → подтянуть профиль
+  // Возврат с Робокассы (Success URL) — paid=1 или параметры OutSum/InvId
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('paid') !== '1') return;
+    const fromRobokassa =
+      params.get('paid') === '1' ||
+      (params.has('InvId') && params.has('OutSum'));
+    if (!fromRobokassa) return;
 
     let cancelled = false;
     void (async () => {
       const id = await getSessionUserId();
       if (!id || cancelled) return;
-      // вебхук может чуть отставать — пара попыток
       for (let i = 0; i < 4 && !cancelled; i++) {
         const pulled = await pullCloudState();
         if (pulled) {
-          setAccount(pulled.account);
+          setAccount(ensureTrialStarted(pulled.account));
           setProgress(pulled.progress);
           setYearProgress(pulled.year);
           if (pulled.account.plan === 'plus') break;
         }
         await new Promise((r) => setTimeout(r, 1500));
       }
-      params.delete('paid');
+      for (const key of [...params.keys()]) {
+        if (
+          key === 'paid' ||
+          key === 'OutSum' ||
+          key === 'InvId' ||
+          key === 'SignatureValue' ||
+          key === 'Culture' ||
+          key === 'IsTest' ||
+          key.startsWith('Shp_')
+        ) {
+          params.delete(key);
+        }
+      }
       const qs = params.toString();
-      const next = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`;
-      window.history.replaceState({}, '', next);
+      window.history.replaceState(
+        {},
+        '',
+        `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`,
+      );
       setRoute({ view: 'account' });
     })();
 

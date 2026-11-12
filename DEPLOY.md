@@ -21,9 +21,10 @@
    - `robokassa-result` (**Verify JWT = OFF**)
 4. В кабинете Робокассы:
    - **Result URL:** `https://ongbagumbavgqrpogauz.supabase.co/functions/v1/robokassa-result`
-   - **Success URL:** `https://naglyadno-math.site/?paid=1`
-   - **Fail URL:** `https://naglyadno-math.site/?paid=0`
+   - **Success URL:** `https://naglyadno-math.site/` (без `?…` — Робокасса сама добавит параметры)
+   - **Fail URL:** `https://naglyadno-math.site/`
    - метод Result: GET или POST
+   - алгоритм хеша: **MD5**
 
 ## 2. Сборка фронта (App Platform)
 
